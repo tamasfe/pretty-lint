@@ -1,7 +1,22 @@
 //! A library for pretty-printing lint errors with a given source text.
-//! 
+//!
 //! The API is fairly minimal, and the output closely resembles rustc's.
-//! 
+//!
+//! # Example usage:
+//!
+//! ```edition2018
+//! # use pretty_lint::{Span, PrettyLint};
+//! let src = "highlight me";
+//!
+//! let lint = PrettyLint::success(src)
+//!             .at(Span::range((1, 1), (1, src.len())))
+//!             .with_message("you have been highlighted")
+//!             .with_inline_message("look at this")
+//!             .with_file_path(file!());
+//!
+//! println!("{}", lint);
+//! ```
+//!
 
 use colored::Colorize;
 
@@ -15,11 +30,30 @@ pub struct Position {
     pub col: usize,
 }
 
+impl Position {
+    pub fn new(line: usize, col: usize) -> Self {
+        Self { col, line }
+    }
+}
+
 /// The range the lint spans.
 #[derive(Debug, Default)]
 pub struct Span {
     pub start: Position,
     pub end: Position,
+}
+
+impl Span {
+    pub fn new(start: Position, end: Position) -> Self {
+        Self { start, end }
+    }
+
+    pub fn range(start: (usize, usize), end: (usize, usize)) -> Self {
+        Self {
+            start: Position::new(start.0, start.1),
+            end: Position::new(end.0, end.1),
+        }
+    }
 }
 
 /// Lint severity.
@@ -64,6 +98,22 @@ impl<'l> PrettyLint<'l> {
         }
     }
 
+    pub fn error(source: &'l str) -> Self {
+        PrettyLint::new(source).with_severity(Severity::Error)
+    }
+
+    pub fn warning(source: &'l str) -> Self {
+        PrettyLint::new(source).with_severity(Severity::Warning)
+    }
+
+    pub fn info(source: &'l str) -> Self {
+        PrettyLint::new(source).with_severity(Severity::Info)
+    }
+
+    pub fn success(source: &'l str) -> Self {
+        PrettyLint::new(source).with_severity(Severity::Success)
+    }
+
     pub fn with_message(mut self, message: &'l str) -> Self {
         self.message = Some(message);
         self
@@ -77,18 +127,6 @@ impl<'l> PrettyLint<'l> {
     pub fn with_severity(mut self, severity: Severity) -> Self {
         self.severity = severity;
         self
-    }
-
-    pub fn error(source: &'l str) -> Self {
-        PrettyLint::new(source).with_severity(Severity::Error)
-    }
-
-    pub fn warning(source: &'l str) -> Self {
-        PrettyLint::new(source).with_severity(Severity::Warning)
-    }
-
-    pub fn info(source: &'l str) -> Self {
-        PrettyLint::new(source).with_severity(Severity::Info)
     }
 
     pub fn with_file_path(mut self, file_path: &'l str) -> Self {
@@ -329,7 +367,7 @@ impl core::fmt::Display for PrettyLint<'_> {
                 .end
                 .col
                 .checked_sub(self.span.start.col)
-                .expect("end position must be after the start position");
+                .unwrap_or(1);
 
             f.write_str(&num_padding)?;
             padding_sep.fmt(f)?;
